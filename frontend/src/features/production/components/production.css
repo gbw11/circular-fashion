@@ -1,0 +1,409 @@
+/* 생산 투입 소재 선택.
+ *
+ * 컴포넌트에서 직접 import 한다 (trade.css · product.css 와 같은 방식) — index.css 는
+ * 여러 사람이 함께 고치는 파일이고 이 스타일은 production 도메인 밖에서 쓰이지 않는다.
+ */
+
+.material-input { display: flex; flex-direction: column; gap: 0.75rem; max-width: 40rem; }
+
+/* 소재 선택과 추가 버튼을 한 줄에 둔다. 버튼이 아래로 떨어지면 "추가" 를 눌러야 하는 줄로
+   보이지 않는다. */
+.material-input__picker { display: flex; gap: 0.6rem; align-items: flex-end; }
+.material-input__picker > :first-child { flex: 1; min-width: 0; }
+
+.material-input__note {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 6px;
+  background: #f4f2ec;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+/* 투입 한 줄. 카드로 묶어 어느 수량이 어느 소재의 것인지 눈으로 갈리게 한다. */
+.material-input__row {
+  padding: 0.9rem 1rem;
+  border: 1px solid #ddd9cd;
+  border-radius: 8px;
+  background: #fff;
+}
+.material-input__row-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.material-input__row-head strong { min-width: 0; overflow-wrap: anywhere; }
+.material-input__available { font-size: 0.8rem; color: #6b7280; }
+.material-input__row-head > :last-child { margin-left: auto; }
+
+/* 제품·자투리·폐기를 나란히. 좁은 화면에서는 접힌다 — 세 값의 관계가 보여야 해서
+   가로 배치를 우선한다. */
+.material-input__quantities {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 34rem) {
+  .material-input__quantities { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.material-input__row-total {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: #172033;
+}
+.material-input__row-total--error { color: #b42318; }
+.material-input__error { margin: 0.35rem 0 0; font-size: 0.82rem; color: #b42318; }
+
+.material-input__actions { display: flex; align-items: center; gap: 0.75rem; }
+.material-input__total { font-size: 0.875rem; color: #6b7280; font-variant-numeric: tabular-nums; }
+
+/* ── 투입 목록 ───────────────────────────────────────── */
+
+.input-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+/* 수량이 다섯 칸이라 좁은 화면에서 넘친다. 표 자체를 스크롤시킨다 —
+   줄바꿈으로 접으면 어느 숫자가 어느 항목인지 알 수 없다. */
+.input-list__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.input-list__caption {
+  margin-bottom: 0.5rem;
+  text-align: left;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+.input-list__table th,
+.input-list__table td {
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid #ece9e0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.input-list__table thead th { color: #6b7280; font-weight: 600; font-size: 0.8rem; }
+/* 소재 이름은 왼쪽 정렬. 숫자와 섞이면 읽는 시작점이 흔들린다. */
+.input-list__table th[scope="row"] { text-align: left; font-weight: 600; }
+.input-list__material { display: flex; flex-direction: column; gap: 0.15rem; white-space: normal; }
+.input-list__reason { font-size: 0.75rem; font-weight: 400; color: #6b7280; }
+
+.input-list__table tfoot th,
+.input-list__table tfoot td {
+  border-top: 2px solid #ddd9cd;
+  border-bottom: none;
+  font-weight: 700;
+}
+
+.input-list__warning {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid #f3c88a;
+  border-radius: 6px;
+  background: #fdf6ec;
+  font-size: 0.85rem;
+  color: #8a4b0b;
+}
+.input-list__note { margin: 0; font-size: 0.8rem; color: #6b7280; }
+
+/* ── 배치 열기 ───────────────────────────────────────── */
+
+.batch-form { display: flex; flex-direction: column; gap: 0.35rem; max-width: 28rem; }
+.batch-form__note {
+  margin: 0.5rem 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 6px;
+  background: #f4f2ec;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+.batch-form__note--warning {
+  border: 1px solid #f3c88a;
+  background: #fdf6ec;
+  color: #8a4b0b;
+}
+
+/* ── 배치 목록 ───────────────────────────────────────── */
+
+.batch-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+.batch-list__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.15rem;
+  border: 1px solid #ddd9cd;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  flex-wrap: wrap;
+}
+.batch-list__link:hover { border-color: #1f6f4a; }
+.batch-list__main { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.batch-list__code { font-size: 0.72rem; color: #6b7280; font-family: ui-monospace, Menlo, monospace; }
+.batch-list__name { font-size: 0.98rem; }
+.batch-list__meta { font-size: 0.82rem; color: #6b7280; font-variant-numeric: tabular-nums; }
+.batch-list__side { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+/* 이어서 할 일이 있는 배치를 눈에 띄게 한다. */
+.batch-list__hint { font-size: 0.72rem; font-weight: 700; color: #b54708; }
+
+/* ── 배치 상세 ───────────────────────────────────────── */
+
+.batch-detail { display: flex; flex-direction: column; gap: 1.75rem; }
+.batch-detail__header { display: flex; flex-direction: column; gap: 0.75rem; }
+.batch-detail__title { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.batch-detail__title h1 { margin: 0; font-size: 1.3rem; }
+
+.batch-detail__meta,
+.batch-detail__result {
+  display: grid;
+  gap: 0.85rem 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  margin: 0;
+}
+.batch-detail__meta dt,
+.batch-detail__result dt { color: #6b7280; font-size: 0.78rem; }
+.batch-detail__meta dd,
+.batch-detail__result dd { margin: 0.2rem 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.batch-detail__code { font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; }
+
+.batch-detail__section { display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start; }
+.batch-detail__section h2 { margin: 0; font-size: 1.05rem; }
+
+/* 확정이 무엇을 하는지 미리 적는다. 되돌릴 수 없는 동작이라 목록으로 나열한다. */
+.batch-detail__effects {
+  margin: 0;
+  padding: 0.85rem 1rem 0.85rem 2rem;
+  border: 1px solid #f3c88a;
+  border-radius: 6px;
+  background: #fdf6ec;
+  font-size: 0.85rem;
+  color: #8a4b0b;
+}
+.batch-detail__effects li + li { margin-top: 0.3rem; }
+
+.batch-detail__note { margin: 0; font-size: 0.85rem; color: #6b7280; }
+
+/* ── 제품 개체와 QR ──────────────────────────────────── */
+
+.item-list { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; }
+.item-list__note,
+.item-list__summary {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 6px;
+  background: #f4f2ec;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.item-list__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  display: block;
+  overflow-x: auto;
+}
+/* QR 주소가 공개 경로라는 사실을 표 위에 붙여 둔다 — 복사 버튼 옆에만 적으면 놓친다. */
+.item-list__caption {
+  margin-bottom: 0.5rem;
+  text-align: left;
+  font-size: 0.8rem;
+  color: #8a4b0b;
+}
+.item-list__table th,
+.item-list__table td {
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid #ece9e0;
+  text-align: left;
+  white-space: nowrap;
+}
+.item-list__table thead th { color: #6b7280; font-weight: 600; font-size: 0.8rem; }
+.item-list__table th[scope="row"] { font-variant-numeric: tabular-nums; color: #6b7280; }
+.item-list__code { font-family: ui-monospace, Menlo, monospace; font-size: 0.82rem; }
+
+.item-list__qr { display: flex; align-items: center; gap: 0.5rem; }
+/* 토큰은 확인용 앞자리만 보여준다. 전체는 복사로만 얻는다. */
+.item-list__token {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+.item-list__open { font-size: 0.8rem; }
+
+/* ── 개체 QR 이미지 (모달 안) ─────────────────────────── */
+
+.item-qr { display: flex; flex-direction: column; align-items: center; gap: 0.85rem; }
+/*
+  흰 바탕을 깐다. QR 은 밝은 배경 위에서만 스캔되는데 PNG 가 투명 배경으로 올 수 있고,
+  그러면 어두운 화면에서 미리보기가 읽히지 않아 라벨이 잘못됐다고 오해한다.
+*/
+.item-qr__image {
+  width: min(320px, 60vw);
+  height: auto;
+  background: #fff;
+  padding: 0.5rem;
+  border-radius: 6px;
+}
+.item-qr__note {
+  margin: 0;
+  max-width: 22rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #6b7280;
+  text-align: center;
+}
+.item-qr__error { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+.item-qr__message { margin: 0; font-size: 0.85rem; color: #b45309; text-align: center; }
+
+/* ── QR 라벨 미리보기 격자 ───────────────────────────── */
+
+.qr-grid { display: flex; flex-direction: column; align-items: flex-start; gap: 0.9rem; width: 100%; }
+.qr-grid__caption {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 6px;
+  background: #f4f2ec;
+  font-size: 0.82rem;
+  color: #8a4b0b;
+}
+/*
+  라벨을 나란히 놓고 보는 것이 이 화면의 목적이다 — 한 장이 빠졌거나 깨진 것은 늘어놓아야
+  눈에 들어온다. 칸 너비를 고정하지 않고 화면에 맞춰 접는다.
+*/
+.qr-grid__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0.85rem;
+  width: 100%;
+}
+.qr-grid__item { display: flex; }
+
+.qr-card {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid #ece9e0;
+  border-radius: 8px;
+  width: 100%;
+}
+/*
+  자리를 미리 잡아 둔다. 이미지가 도착할 때마다 칸 높이가 바뀌면 격자 전체가 출렁이고,
+  방금 보던 라벨이 화면 밖으로 밀린다.
+*/
+.qr-card__frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 160px;
+  background: #fff;
+  border-radius: 6px;
+}
+.qr-card__image { width: 100%; max-width: 160px; height: auto; }
+.qr-card__error { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 0.5rem; }
+.qr-card__message { margin: 0; font-size: 0.78rem; color: #b45309; text-align: center; }
+.qr-card__caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+}
+.qr-card__code { font-family: ui-monospace, Menlo, monospace; color: #6b7280; }
+
+.qr-grid__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+/* 인쇄되지 않는 장수를 눈에 띄게 적는다 — 인쇄물을 세어 보고 알게 하지 않는다. */
+.qr-grid__hint { margin: 0; font-size: 0.8rem; color: #8a4b0b; }
+
+/* ── 라벨 인쇄 ────────────────────────────────────────
+   제품 태그에 붙일 라벨을 종이에 뽑는다. 화면과 종이는 목적이 달라 규칙도 다르다.
+   ──────────────────────────────────────────────────── */
+
+@media print {
+  /*
+    라벨만 남긴다. 사이드바·머리말·버튼이 함께 인쇄되면 첫 줄이 통째로 밀려 라벨 한 줄이
+    종이 밖으로 나간다. display:none 대신 visibility 를 쓰는 이유는 조상 요소(셸·페이지
+    래퍼)를 지우지 않고 그 안의 격자만 남기기 위해서다.
+
+    ⚠️ **`body:has(.qr-grid)` 로 가둔다.** 이 파일의 CSS 는 앱 전체에 실린다 — 조건 없이
+    적으면 라벨 격자가 없는 화면에서 Ctrl+P 를 눌렀을 때 빈 종이가 나온다.
+  */
+  body:has(.qr-grid) * { visibility: hidden; }
+  body:has(.qr-grid) .qr-grid,
+  body:has(.qr-grid) .qr-grid * { visibility: visible; }
+  .qr-grid {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    gap: 0;
+  }
+
+  /* 화면 안내와 조작은 종이에 둘 자리가 없다. */
+  .qr-grid__caption,
+  .qr-grid__actions,
+  .qr-grid__hint,
+  .qr-card .ui-button,
+  .qr-card .ui-badge {
+    display: none;
+  }
+
+  /*
+    한 줄에 넷. 화면처럼 폭에 맞춰 접게 두면 인쇄 미리보기마다 장수가 달라져, 자를 위치를
+    가늠할 수 없다.
+  */
+  .qr-grid__list {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6mm;
+  }
+
+  /*
+    라벨 한 장이 페이지 경계에 걸쳐 잘리면 그 장은 못 쓴다. 테두리는 자르는 선이라
+    화면보다 진하게 둔다.
+  */
+  .qr-card {
+    break-inside: avoid;
+    border: 1px solid #999;
+    padding: 3mm;
+    gap: 2mm;
+  }
+  /* 40mm. 이보다 작으면 인쇄 후 스캔이 어렵다 — 모듈 하나가 잉크 번짐에 묻힌다. */
+  .qr-card__frame { min-height: auto; }
+  .qr-card__image { width: 40mm; max-width: 40mm; height: 40mm; }
+  /* 어느 개체의 라벨인지 종이 위에서도 알아야 한다. 붙이기 전에 짝을 맞춘다. */
+  .qr-card__caption { font-size: 8pt; }
+}
+
+/* ── 온체인 단계 목록 ────────────────────────────────── */
+
+/* 공통 OnChainPanel 안에 들어가는 보조 표시다. 패널 자체의 스타일은 그쪽 CSS 가 갖는다. */
+.chain-steps {
+  margin: 0.75rem 0 0;
+  padding-left: 1.35rem;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+.chain-steps li + li { margin-top: 0.2rem; }
+.chain-steps__done { color: #1f6f4a; font-weight: 600; }
+/* 아직 프론트가 부를 수 없는 단계. 대기와 구분되어야 한다. */
+.chain-steps__pending {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: #ece9e0;
+  font-size: 0.72rem;
+}
