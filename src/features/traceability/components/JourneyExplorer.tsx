@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps'
 import { Modal, TransactionHash } from '../../../components/common/index.ts'
+import { MATERIAL_TYPE_LABEL } from '../../material/types/material.types.ts'
 import { STAGE_LABEL, STAGE_META, STAGE_ORDER, stageIndex } from '../utils/journeyStages.ts'
 import type {
   BlockchainProof,
@@ -44,16 +45,6 @@ const PROCESS_LABEL: Record<string, string> = {
   SHREDDING: '파쇄',
   SORTING: '선별',
   SURFACE_FINISHING: '표면 가공',
-}
-
-const MATERIAL_LABEL: Record<string, string> = {
-  COTTON: '면',
-  DENIM: '데님',
-  ETC: '기타',
-  LEATHER: '가죽',
-  LINING: '안감',
-  METAL: '금속',
-  MIXED: '혼합 소재',
 }
 
 function formatDate(value: string | null): string {
@@ -665,7 +656,7 @@ function NodeDetail({ node }: { node: JourneyNode }) {
               <li key={`${material.name}-${index}`}>
                 <span><Leaf size={17} />{material.name}</span>
                 <strong>{formatQuantity(material.batchQuantityGrams)}</strong>
-                <small>{MATERIAL_LABEL[material.materialType] ?? material.materialType}</small>
+                <small>{MATERIAL_TYPE_LABEL[material.materialType] ?? material.materialType}</small>
               </li>
             ))}
           </ul>
