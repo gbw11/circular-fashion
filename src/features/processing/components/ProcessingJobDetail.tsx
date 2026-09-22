@@ -2,6 +2,7 @@ import { ArrowLeft, CheckCircle, Factory, Package, Plus, Trash, X } from '@phosp
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../../stores/authStore.ts'
+import { uploadEvidence } from '../../evidence/api/uploadEvidence.ts'
 import { EvidenceUpload } from '../../evidence/components/EvidenceUpload.tsx'
 import { EVIDENCE_TYPE_LABEL } from '../../evidence/types/evidence.types.ts'
 import { GRADE_LABEL, type MaterialGrade } from '../../material/types/material.types.ts'
@@ -11,6 +12,7 @@ import { useProcessingJob } from '../hooks/useProcessingJobs.ts'
 import { PROCESSING_CHAIN_STATUS } from '../services/processingContractService.ts'
 import type { ProcessingJobDetail as ProcessingJob } from '../api/processingJobApi.ts'
 import type { ProcessingRequestDetail } from '../api/processingRequestApi.ts'
+import { WeightPhotoRecognition } from '../../material/components/WeightPhotoRecognition.tsx'
 import { ProcessingShipmentForm } from './ProcessingShipmentForm.tsx'
 import { formatDateTime } from '../utils/processingTime.ts'
 import './processing-jobs.css'
@@ -37,8 +39,15 @@ const PROGRESS_STEPS = [
 ] as const
 
 // 산출 소재 종류는 여기 없다. 투입 소재에서 그대로 따라오므로 폼이 담을 값이 아니다.
-type Row = { grade: MaterialGrade; gradeReason: string; name: string; quantity: string }
-const emptyRow = (): Row => ({ grade:'A', gradeReason:'', name:'', quantity:'' })
+//
+// photo 는 그 행의 산출물을 올려 둔 저울 사진이다. evidenceId 는 그 사진이 이미 증빙으로
+// 올라갔는지를 들고 있다 — 증빙은 소프트 삭제라 같은 사진을 두 번 올리면 기록에 둘 다
+// 남으므로, 저장을 다시 눌러도 한 번만 올라가게 하려면 올린 결과를 기억해야 한다.
+type Row = {
+  grade: MaterialGrade; gradeReason: string; name: string; quantity: string
+  photo: File | null; evidenceId: number | null
+}
+const emptyRow = (): Row => ({ grade:'A', gradeReason:'', name:'', quantity:'', photo:null, evidenceId:null })
 
 export function ProcessingJobDetail({ jobId }: { jobId:number }) {
   const role = useAuthStore(state => state.user?.role)
@@ -57,9 +66,17 @@ function ProcessingJobDetailContent({ jobId, job, request, role, flow }: {
   flow: ReturnType<typeof useProcessingJob>
 }) {
   const [rows,setRows] = useState<Row[]>(() => job.outputs.length > 0
-    ? job.outputs.map(output => ({ grade:output.grade, gradeReason:output.gradeReason, name:output.name, quantity:String(output.quantity) }))
+    ? job.outputs.map(output => ({ grade:output.grade, gradeReason:output.gradeReason, name:output.name, quantity:String(output.quantity), photo:null, evidenceId:null }))
     : [emptyRow()])
   const [reason,setReason] = useState('')
+  // 가공 전 저울 사진. 채울 칸이 없으므로(투입 수량은 브랜드가 정한 값이다) 인식한 무게는
+  // 대조에만 쓴다 — 받은 물건이 보낸 양과 다르면 가공을 시작하기 전에 드러나야 한다.
+  const [beforePhoto,setBeforePhoto] = useState<File|null>(null)
+  const [beforeEvidenceId,setBeforeEvidenceId] = useState<number|null>(null)
+  const [beforeWeight,setBeforeWeight] = useState<number|null>(null)
+  const [isUploadingPhotos,setUploadingPhotos] = useState(false)
+  const [photoUploadError,setPhotoUploadError] = useState<string|null>(null)
+  const beforeGap=beforeWeight===null?0:beforeWeight-job.inputQuantity
   // 거절은 사유가 필수라 한 번 더 묻는다 — 눌러서 바로 끝나는 일이 아니다.
   const [declining,setDeclining] = useState(false)
   const [declineReason,setDeclineReason] = useState('')
@@ -75,7 +92,46 @@ function ProcessingJobDetailContent({ jobId, job, request, role, flow }: {
   const excessQuantity=Math.max(outputSum-job.inputQuantity,0)
   const hasInvalidOutput=rows.some(row=>!row.name.trim()||!row.gradeReason.trim()||!Number.isSafeInteger(Number(row.quantity))||Number(row.quantity)<=0)
   const cannotSave=pending||excessQuantity>0||hasInvalidOutput
-  const save=()=>flow.saveResult.mutate({outputs:rows.map(row=>({...row,name:row.name.trim(),gradeReason:row.gradeReason.trim(),quantity:Number(row.quantity)}))})
+  // **행을 펼쳐 보내지 않는다.** 행에는 저울 사진(File)과 업로드 결과가 함께 들어 있어,
+  // 펼치면 서버가 알지도 못하는 값이 요청에 실린다. 보낼 네 가지를 이름으로 적는다.
+  const outputPayload=(list:Row[])=>list.map(row=>({
+    grade:row.grade, gradeReason:row.gradeReason.trim(), name:row.name.trim(), quantity:Number(row.quantity),
+  }))
+  /**
+   * 저울 사진을 증빙으로 올린 뒤 결과를 저장한다.
+   *
+   * <b>순서가 중요하다.</b> 사진은 산출 수량의 근거라, 수량만 저장되고 근거가 빠진 상태를
+   * 만들지 않는다. 업로드가 실패하면 저장까지 멈추고 이유를 띄운다.
+   *
+   * <b>이미 올린 사진은 건너뛴다.</b> 증빙은 소프트 삭제라 같은 사진을 두 번 올리면 기록에
+   * 둘 다 남는다. 올린 결과(evidenceId)를 기억해 두면 저장을 다시 눌러도 한 번만 올라간다.
+   */
+  const save=async()=>{
+    setPhotoUploadError(null)
+    let nextRows=rows
+    setUploadingPhotos(true)
+    try {
+      if (beforePhoto!==null&&beforeEvidenceId===null) {
+        const uploaded=await uploadEvidence({referenceType:'PROCESSING_JOB',referenceId:jobId,evidenceType:'BEFORE_PHOTO',files:[beforePhoto]})
+        if (uploaded.length===0) throw new Error('empty')
+        setBeforeEvidenceId(uploaded[0].evidenceFileId)
+      }
+      for (let index=0;index<nextRows.length;index+=1) {
+        const row=nextRows[index]
+        if (row.photo===null||row.evidenceId!==null) continue
+        const uploaded=await uploadEvidence({referenceType:'PROCESSING_JOB',referenceId:jobId,evidenceType:'AFTER_PHOTO',files:[row.photo]})
+        if (uploaded.length===0) throw new Error('empty')
+        nextRows=nextRows.map((x,i)=>i===index?{...x,evidenceId:uploaded[0].evidenceFileId}:x)
+      }
+      setRows(nextRows)
+    } catch {
+      setPhotoUploadError('저울 사진 증빙 업로드에 실패했습니다. 다시 시도해 주세요.')
+      return
+    } finally {
+      setUploadingPhotos(false)
+    }
+    flow.saveResult.mutate({outputs:outputPayload(nextRows)})
+  }
   const counterparty = role === 'PROCESSOR' ? request?.brandName : request?.processorName
   return <section className="pj-detail">
     <Link to={role==='PROCESSOR'?'/processor/jobs':'/brand/processing/jobs'}><ArrowLeft/>목록으로</Link>
@@ -116,6 +172,18 @@ function ProcessingJobDetailContent({ jobId, job, request, role, flow }: {
     {role==='PROCESSOR'&&job.status==='RECEIVED'&&<section className="pj-panel pj-action"><p>투입 소재와 작업 조건을 확인한 뒤 가공을 시작합니다.</p><button disabled={pending} onClick={()=>flow.start.mutate()}>가공 시작</button></section>}
 
     {role==='PROCESSOR'&&(job.status==='PROCESSING'||job.status==='REJECTED')&&<section className="pj-panel"><h2><Factory/>가공 결과 작성</h2>{job.rejectionReason&&<p className="pj-warning">Brand 반려 사유: {job.rejectionReason}</p>}
+      <WeightPhotoRecognition
+        idPrefix="pj-before"
+        title="가공 전 저울 사진으로 무게 인식"
+        fileLabel="가공 전 저울 사진"
+        description="가공을 시작하기 전 투입 소재를 올린 저울 화면이 선명하게 보이도록 촬영해 주세요."
+        applyLabel="투입 수량과 대조"
+        onFileChange={file=>{setBeforePhoto(file);setBeforeEvidenceId(null);if(file===null)setBeforeWeight(null)}}
+        onApply={setBeforeWeight}
+      />
+      {beforeGap!==0&&<p className="pj-warning" role="alert">
+        가공 전 무게가 투입 수량 {job.inputQuantity.toLocaleString()} g 보다 {Math.abs(beforeGap).toLocaleString()} g {beforeGap<0?'적습니다':'많습니다'}. 저울과 사진을 다시 확인해 주세요.
+      </p>}
       {rows.map((row,index)=><fieldset className="pj-output" key={index}>
         <legend>산출물 {index+1}</legend>
         <div className="pj-output__grid">
@@ -129,6 +197,16 @@ function ProcessingJobDetailContent({ jobId, job, request, role, flow }: {
           <label>산출 수량(g)<input aria-label={`산출물 ${index+1} 산출 수량(g)`} type="number" min="1" step="1" placeholder="예: 650" value={row.quantity} onChange={e=>setRows(v=>v.map((x,i)=>i===index?{...x,quantity:e.target.value}:x))}/></label>
         </div>
         <label className="pj-output__reason">등급 판정 사유<textarea aria-label={`산출물 ${index+1} 등급 판정 사유`} maxLength={500} placeholder="오염이나 손상 상태 등 해당 등급으로 판단한 근거를 입력하세요." value={row.gradeReason} onChange={e=>setRows(v=>v.map((x,i)=>i===index?{...x,gradeReason:e.target.value}:x))}/></label>
+        {/* 산출 수량은 손으로 적는 값이라 오타가 그대로 온체인까지 간다. 저울 사진에서
+            읽은 값을 그 행에만 넣어 준다 — 소재 등록의 무게 인식과 같은 파이프라인이다. */}
+        <WeightPhotoRecognition
+          idPrefix={`pj-output-${index+1}`}
+          title={`산출물 ${index+1} 가공 후 저울 사진으로 무게 인식`}
+          fileLabel={`산출물 ${index+1} 가공 후 저울 사진`}
+          description="가공을 마친 산출물을 올린 저울 화면이 선명하게 보이도록 촬영해 주세요."
+          onFileChange={file=>setRows(v=>v.map((x,i)=>i===index?{...x,photo:file,evidenceId:null}:x))}
+          onApply={gram=>setRows(v=>v.map((x,i)=>i===index?{...x,quantity:String(gram)}:x))}
+        />
         {rows.length>1&&<button className="pj-output__remove" aria-label={`산출물 ${index+1} 삭제`} onClick={()=>setRows(v=>v.filter((_,i)=>i!==index))}><Trash/>산출물 삭제</button>}
       </fieldset>)}
       <button className="pj-secondary" onClick={()=>setRows(v=>[...v,emptyRow()])}><Plus/>산출물 추가</button>
@@ -138,7 +216,8 @@ function ProcessingJobDetailContent({ jobId, job, request, role, flow }: {
         <div><span>자동 계산 Loss</span><output aria-label="자동 계산 Loss">{lossQuantity.toLocaleString()} g</output></div>
       </div>
       {excessQuantity>0&&<p className="pj-warning" role="alert">산출 수량 합계가 투입량을 {excessQuantity.toLocaleString()} g 초과했습니다.</p>}
-      <button disabled={cannotSave} onClick={save}>결과 임시 저장</button>
+      <button disabled={cannotSave||isUploadingPhotos} onClick={()=>void save()}>{isUploadingPhotos?'저울 사진 올리는 중…':'결과 임시 저장'}</button>
+      {photoUploadError&&<p className="pj-warning" role="alert">{photoUploadError}</p>}
       <div className="pj-evidence"><h3>가공 증빙</h3><EvidenceUpload referenceType="PROCESSING_JOB" referenceId={jobId} uploadMode="type-grid"/></div>
       {job.resultRevision>0&&<button className="pj-sign" disabled={pending} onClick={()=>flow.submit.mutate()}>MetaMask 서명 후 결과 제출</button>}
     </section>}

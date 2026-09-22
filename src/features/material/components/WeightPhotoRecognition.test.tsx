@@ -244,4 +244,48 @@ describe('WeightPhotoRecognition', () => {
     expect(screen.queryByRole('img', { name: '선택한 저울 사진 미리보기' })).not.toBeInTheDocument()
     expect(screen.queryByText('1,250 g')).not.toBeInTheDocument()
   })
+
+  /*
+    가공 결과 화면은 산출물 행마다 이 컴포넌트를 하나씩 그린다. id 가 고정이면 같은
+    id 가 여러 번 나오고, htmlFor 는 문서에서 처음 만난 하나만 가리킨다 — 두 번째
+    칸의 라벨을 눌러도 첫 번째 칸이 열리고, 접근성 이름으로 칸을 구분할 수 없다.
+  */
+  it('idPrefix 와 제목을 받아 한 화면에 여러 번 그릴 수 있다', async () => {
+    const onApplyBefore = vi.fn()
+    const onApplyAfter = vi.fn()
+    render(
+      <>
+        <WeightPhotoRecognition
+          idPrefix="before"
+          title="가공 전 저울 사진으로 무게 인식"
+          fileLabel="가공 전 저울 사진"
+          onApply={onApplyBefore}
+          onFileChange={vi.fn()}
+        />
+        <WeightPhotoRecognition
+          idPrefix="output-1"
+          title="가공 후 저울 사진으로 무게 인식"
+          fileLabel="가공 후 저울 사진"
+          onApply={onApplyAfter}
+          onFileChange={vi.fn()}
+        />
+      </>,
+    )
+
+    const before = screen.getByLabelText('가공 전 저울 사진')
+    const after = screen.getByLabelText('가공 후 저울 사진')
+    expect(before.id).toBe('before-image')
+    expect(after.id).toBe('output-1-image')
+
+    const user = userEvent.setup()
+    await user.upload(after, imageFile())
+    await screen.findByText('1,250 g')
+
+    // 인식 결과도 적용도 사진을 넣은 쪽에서만 일어난다 — 라벨이 엉뚱한 칸을 가리키면
+    // 여기서 갈린다.
+    expect(screen.getAllByText('1,250 g')).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: '인식 무게 적용' }))
+    expect(onApplyAfter).toHaveBeenCalledWith(1_250)
+    expect(onApplyBefore).not.toHaveBeenCalled()
+  })
 })

@@ -8,6 +8,27 @@ import './material.css'
 export interface WeightPhotoRecognitionProps {
   onApply(weightGram: number): void
   onFileChange(file: File | null): void
+  /**
+   * DOM id 앞에 붙는 값. **한 화면에 두 개 이상 그릴 때 반드시 서로 다르게 준다.**
+   *
+   * 가공 결과 화면은 산출물 행마다 하나씩 그린다. 고정 id 를 쓰면 같은 id 가 여러 번
+   * 나오고, `htmlFor` 는 문서에서 처음 만난 하나만 가리킨다 — 두 번째 칸의 라벨을 눌러도
+   * 첫 번째 칸이 열리고, 스크린리더와 테스트 모두 칸을 구분하지 못한다.
+   */
+  idPrefix?: string
+  /** 제목. 소재 등록 외의 화면은 무엇을 재는 사진인지 밝혀야 한다. */
+  title?: string
+  description?: string
+  /** 파일 선택 칸의 라벨. 이것이 그 칸의 접근성 이름이라 인스턴스마다 달라야 한다. */
+  fileLabel?: string
+  /**
+   * 적용 버튼의 글자.
+   *
+   * 인식한 무게가 늘 입력칸으로 가는 것은 아니다 — 가공 전 무게처럼 채울 칸이 없고
+   * 대조만 하는 자리도 있다. 그런 자리에 "적용" 이라고 적으면 무엇이 어디에 적용됐는지
+   * 찾게 된다.
+   */
+  applyLabel?: string
 }
 
 const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png'])
@@ -18,7 +39,14 @@ const FAILURE_FALLBACK = '무게를 인식하지 못했습니다.'
 export function WeightPhotoRecognition({
   onApply,
   onFileChange,
+  idPrefix = 'weight-recognition',
+  title = '저울 사진으로 무게 인식',
+  description = '숫자와 저울 화면이 선명하게 보이도록 촬영해 주세요.',
+  fileLabel = '저울 사진',
+  applyLabel = '인식 무게 적용',
 }: WeightPhotoRecognitionProps) {
+  const titleId = `${idPrefix}-title`
+  const inputId = `${idPrefix}-image`
   const [file, setFile] = useState<File | null>(null)
   const [result, setResult] = useState<WeightRecognitionResult | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -88,11 +116,11 @@ export function WeightPhotoRecognition({
   const isRecognitionFailure = result !== null && !isCandidate
 
   return (
-    <section className="weight-recognition" aria-labelledby="weight-recognition-title">
+    <section className="weight-recognition" aria-labelledby={titleId}>
       <div className="weight-recognition__heading">
         <div>
-          <h3 id="weight-recognition-title">저울 사진으로 무게 인식</h3>
-          <p>숫자와 저울 화면이 선명하게 보이도록 촬영해 주세요.</p>
+          <h3 id={titleId}>{title}</h3>
+          <p>{description}</p>
         </div>
         {file && (
           <Button
@@ -106,11 +134,11 @@ export function WeightPhotoRecognition({
         )}
       </div>
 
-      <label className="weight-recognition__file-label" htmlFor="weight-recognition-image">
-        저울 사진
+      <label className="weight-recognition__file-label" htmlFor={inputId}>
+        {fileLabel}
       </label>
       <input
-        id="weight-recognition-image"
+        id={inputId}
         className="weight-recognition__file-input"
         type="file"
         accept="image/jpeg,image/png"
@@ -174,7 +202,7 @@ export function WeightPhotoRecognition({
             disabled={!canApply}
             onClick={() => onApply(recognizedWeight.value)}
           >
-            인식 무게 적용
+            {applyLabel}
           </Button>
         </div>
       )}

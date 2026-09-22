@@ -5,9 +5,10 @@
 /**
  * `evidence_file.reference_type` — 증빙이 무엇에 딸려 있는가.
  *
- * ⚠️ **지금 서버가 받는 것은 `MATERIAL` 하나뿐이다.** 나머지 셋은 대상 존재를 확인할
- * 엔티티가 없어 `EVIDENCE_REFERENCE_NOT_SUPPORTED` 로 거절된다. 타입에는 남겨 두고
- * (스키마 ENUM 이 그렇다) 화면은 소재만 쓴다.
+ * ⚠️ **서버가 받는 것은 `MATERIAL` 과 `PROCESSING_JOB` 둘이다** (`EvidenceReferenceValidator`).
+ * 나머지 둘(`PRODUCTION_BATCH`, `PRODUCTION_INPUT`)은 대상 존재를 확인할 엔티티가 없어
+ * `EVIDENCE_REFERENCE_NOT_SUPPORTED` 로 거절된다. 타입에는 남겨 둔다 — 스키마 ENUM 이
+ * 그렇고, 서버가 지원을 늘릴 때 이 타입부터 고치지 않아도 되게 한다.
  */
 export type EvidenceReferenceType =
   | 'MATERIAL'
