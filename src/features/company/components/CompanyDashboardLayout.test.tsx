@@ -201,6 +201,33 @@ describe('CompanyDashboardLayout', () => {
     })
   })
 
+  // 소재 검색 화면 오른쪽 아래에만 떠 있어서, 다른 화면에서는 어시스턴트를 부를 길이 없었다.
+  it('브랜드 머리말의 쇼핑몰 바로 왼쪽에 새르파 AI 버튼을 둔다', () => {
+    setBusinessUser('BRAND')
+    renderLayout()
+
+    const shop = screen.getByRole('link', { name: '쇼핑몰' })
+    const agent = screen.getByRole('button', { name: '새르파 AI' })
+    expect(agent.nextElementSibling).toBe(shop)
+  })
+
+  it.each([['SUPPLIER'], ['PROCESSOR'], ['CONSUMER']] as const)(
+    '%s 머리말에는 새르파 AI 버튼이 없다',
+    (role) => {
+      setBusinessUser(role)
+      renderLayout()
+
+      expect(screen.queryByRole('button', { name: /새르파 AI/ })).not.toBeInTheDocument()
+    },
+  )
+
+  it('승인 전 브랜드에게는 새르파 AI 버튼을 보이지 않는다', () => {
+    setBusinessUser('BRAND')
+    renderLayout('/company/account', { ...approvedProfile, roleApprovalStatus: 'PENDING' })
+
+    expect(screen.queryByRole('button', { name: /새르파 AI/ })).not.toBeInTheDocument()
+  })
+
   it('shows the persistent wallet status beside the business account shortcut', async () => {
     const user = userEvent.setup()
     setBusinessUser('BRAND')
