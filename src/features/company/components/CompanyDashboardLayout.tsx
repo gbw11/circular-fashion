@@ -97,6 +97,15 @@ export function CompanyDashboardLayout({ children }: CompanyDashboardLayoutProps
   const companyProfile = useCompanyProfile(isBusinessUser)
   const roleApprovalStatus = companyProfile.profile?.roleApprovalStatus
   const roleApproved = !isBusinessUser || roleApprovalStatus === 'APPROVED'
+  /*
+    **사업자에게는 업체명을 보인다.** 계정의 name 은 가입할 때 적은 대표자 이름이라, 그대로 두면
+    담당자가 자기 업체가 아니라 대표 개인으로 일하는 것처럼 읽힌다. 업체 정보가 오기 전에는
+    대표자 이름을 먼저 그리지 않고 자리만 채운다 — 그러지 않으면 이름이 한 번 바뀌며 번쩍인다.
+    소비자·관리자는 업체가 없으므로 자기 이름이다.
+  */
+  const displayName = isBusinessUser
+    ? (companyProfile.profile?.companyName || '회사 계정')
+    : (user?.name ?? '회사 계정')
   // 역할→메뉴 매핑을 이 파일이 들고 있지 않다. routes.tsx 의 RoleGuard 정의에서
   // 파생된다 (app/navigation/navigationMenu.ts 머리말). 예전에는 여기에 역할별 배열이
   // 있어서 라우트를 추가해도 메뉴가 따라오지 않았다 — /supplier/trades 와
@@ -148,7 +157,7 @@ export function CompanyDashboardLayout({ children }: CompanyDashboardLayoutProps
           <img src={`${import.meta.env.BASE_URL}img/logo.png`} alt="" />
         </Link>
         <div className="company-dashboard__identity">
-          <span>{user?.name ?? '회사 계정'}</span>
+          <span>{displayName}</span>
           {user ? (
             <small>{isBusinessUserRole(user.role) ? BUSINESS_ROLE_LABEL[user.role] : ROLE_LABEL[user.role]}</small>
           ) : null}
@@ -213,7 +222,7 @@ export function CompanyDashboardLayout({ children }: CompanyDashboardLayoutProps
         >
           <div className="company-dashboard__sidebar-heading">
             <span>BUSINESS WORKSPACE</span>
-            <strong>{user?.name ?? '회사 계정'}</strong>
+            <strong>{displayName}</strong>
           </div>
           {/*
             역할 판정 중에는 aria-busy 만 두고 링크를 그리지 않는다. 이때 잘못

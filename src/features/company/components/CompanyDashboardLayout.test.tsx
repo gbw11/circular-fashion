@@ -31,7 +31,9 @@ function setBusinessUser(role: UserRole) {
   useAuthStore.setState({
     user: {
       id: 7,
-      name: '새로이 기업',
+      // 사업자 계정의 이름은 가입할 때 적은 대표자 이름이다. 업체명과 다르게 두어야 머리말이
+      // 어느 쪽을 그리는지 가를 수 있다.
+      name: '김대표',
       email: 'company@saeroi.test',
       role,
       walletAddress: null,
@@ -226,6 +228,40 @@ describe('CompanyDashboardLayout', () => {
     renderLayout('/company/account', { ...approvedProfile, roleApprovalStatus: 'PENDING' })
 
     expect(screen.queryByRole('button', { name: /새르파 AI/ })).not.toBeInTheDocument()
+  })
+
+  // 사업자 화면에서 "누구로 일하고 있는가" 는 사람이 아니라 업체다. 대표자 이름이 뜨면 같은
+  // 업체의 담당자가 자기 계정이 아닌 것처럼 읽는다.
+  it('사업자 머리말과 사이드바에 대표자 이름 대신 업체명을 보인다', () => {
+    setBusinessUser('BRAND')
+    const { container } = renderLayout()
+
+    expect(container.querySelector('.company-dashboard__identity')).toHaveTextContent('새로이 기업')
+    expect(container.querySelector('.company-dashboard__sidebar-heading')).toHaveTextContent('새로이 기업')
+    expect(screen.queryByText('김대표')).not.toBeInTheDocument()
+  })
+
+  it('업체 정보를 받기 전에는 대표자 이름을 먼저 그리지 않는다', () => {
+    setBusinessUser('SUPPLIER')
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    vi.spyOn(apiClient, 'get').mockReturnValue(new Promise(() => {}))
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/company/account']}>
+          <CompanyDashboardLayout><h1>회사 정보 본문</h1></CompanyDashboardLayout>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(screen.queryByText('김대표')).not.toBeInTheDocument()
+    expect(container.querySelector('.company-dashboard__identity')).toHaveTextContent('회사 계정')
+  })
+
+  it('소비자에게는 자기 이름을 그대로 보인다', () => {
+    setBusinessUser('CONSUMER')
+    const { container } = renderLayout()
+
+    expect(container.querySelector('.company-dashboard__identity')).toHaveTextContent('김대표')
   })
 
   it('shows the persistent wallet status beside the business account shortcut', async () => {
