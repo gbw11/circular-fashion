@@ -38,8 +38,8 @@
 
 원래 프로젝트는 GitLab에서 파트별 장기 브랜치(`backend/*`, `frontend/*`, `ai/*`, `blockchain/*`, `deploy/*`)로 나뉘어 독립적으로 운영됩니다. 이 저장소는 그 결과물을 한 번에 볼 수 있도록 정리한 **포트폴리오 전용 스냅샷**이며, 실제 작업은 팀 GitLab에서 이루어집니다.
 
-- `master` — 각 파트 안정 버전(`*/master`)을 `backend/`, `frontend/`, `ai/`, `blockchain/` 서브디렉토리로 모은 브랜치
-- `develop` — 각 파트 개발 버전(`*/develop`) + 배포 설정(`deploy/master`)을 서브디렉토리로 모은 브랜치
+- `portfolio` (기본 브랜치) — 각 파트 개발 버전(`*/develop`) + 배포 설정(`deploy/master`)을 `backend/`, `frontend/`, `ai/`, `blockchain/`, `deploy/` 서브디렉토리로 모은 스냅샷. 커밋 탭에서 파트별 원본 커밋 이력도 함께 볼 수 있습니다.
+- 그 밖의 브랜치(`backend/*`, `frontend/*`, `ai/*`, `blockchain/*`, `deploy/*`, `master`) — 팀 GitLab 원본 브랜치를 커밋 이력째 그대로 옮긴 미러
 
 ## 저의 역할
 
